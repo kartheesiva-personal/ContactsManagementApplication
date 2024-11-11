@@ -1,4 +1,5 @@
 ﻿using ContactsManagementApplication.Models;
+using ContactsManagementApplication.Server.services;
 using ContactsManagementApplication.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
@@ -9,76 +10,76 @@ namespace ContactManagerApi.Controllers
     [ApiController]
     public class ContactController : ControllerBase
     {
-        private readonly ContactService _contactService;
+        private readonly IContactService _contactService;
 
-        public ContactController(ContactService contactService)
+        public ContactController(IContactService contactService)
         {
             _contactService = contactService;
         }
 
+        // Get All Contacts
         [HttpGet]
-        public ActionResult<List<Contact>> GetContacts()
+        public async Task<IActionResult> GetAllContacts()
         {
-            try
-            {
-                return Ok(_contactService.GetContacts());
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "Internal server error.");
-            }
+            var contacts = await _contactService.GetAllContactsAsync();
+            return Ok(contacts);
         }
 
-        [HttpGet("{id}")]
-        public ActionResult<Contact> GetContact(int id)
-        {
-            var contact = _contactService.GetContactById(id);
-            if (contact == null)
-                return NotFound("Contact not found.");
 
+        // Get Contact by ID
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetContactById(int id)
+        {
+            var contact = await _contactService.GetContactByIdAsync(id);
+            if (contact == null)
+            {
+                return NotFound();
+            }
             return Ok(contact);
         }
 
+        // Create Contact
         [HttpPost]
-        public IActionResult CreateContact([FromBody] Contact contact)
+        public async Task<IActionResult> CreateContact([FromBody] Contact contact)
         {
-            try
+            if (contact == null)
             {
-                _contactService.AddContact(contact);
-                return CreatedAtAction(nameof(GetContact), new { id = contact.Id }, contact);
+                return BadRequest();
             }
-            catch (Exception)
-            {
-                return StatusCode(500, "Error creating contact.");
-            }
+
+            var createdContact = await _contactService.CreateContactAsync(contact);
+            return CreatedAtAction(nameof(GetContactById), new { id = createdContact.Id }, createdContact);
         }
 
+        // Update Contact by ID
         [HttpPut("{id}")]
-        public IActionResult UpdateContact(int id, [FromBody] Contact contact)
+        public async Task<IActionResult> UpdateContact(int id, [FromBody] Contact contact)
         {
-            try
+            if (contact == null || id != contact.Id)
             {
-                _contactService.UpdateContact(id, contact);
-                return NoContent();
+                return BadRequest();
             }
-            catch (Exception)
+
+            var updatedContact = await _contactService.UpdateContactAsync(id, contact);
+            if (updatedContact == null)
             {
-                return NotFound("Contact not found.");
+                return NotFound();
             }
+
+            return Ok(updatedContact);
         }
 
+        // Delete Contact by ID
         [HttpDelete("{id}")]
-        public IActionResult DeleteContact(int id)
+        public async Task<IActionResult> DeleteContact(int id)
         {
-            try
+            var deleted = await _contactService.DeleteContactAsync(id);
+            if (!deleted)
             {
-                _contactService.DeleteContact(id);
-                return NoContent();
+                return NotFound();
             }
-            catch (Exception)
-            {
-                return NotFound("Contact not found.");
-            }
+
+            return NoContent();
         }
     }
 }

@@ -1,36 +1,51 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, AfterViewInit, ViewChild, ElementRef, EventEmitter } from '@angular/core';
 import { ContactService } from '../../Service/contact.service';
 import { Contact } from '../../Modal/Contact';
-declare var $: any;  // jQuery is required for Bootstrap modal methods
 @Component({
   selector: 'app-contact-list',
   templateUrl: 'contact-list.component.html',
   styleUrls: ['contact-list.component.scss']
 })
-export class ContactListComponent {
+export class ContactListComponent implements AfterViewInit {
+  @ViewChild('contactFormModal') modal!: ElementRef;
   @Input() contacts: any[] = [];
   @Output() deleteContact = new EventEmitter<number>();
   @Output() editContact = new EventEmitter<any>();
+
+  ngAfterViewInit() {
+    // Wait until view is initialized and modal is available in the DOM
+    const modalElement = this.modal.nativeElement;
+    const modal = new window.bootstrap.Modal(modalElement);
+  }
+  // Inject the service in the constructor
   constructor(private contactService: ContactService) { }
 
   ngOnInit(): void {
-    this.contactService.getContacts().subscribe((data) => {
+    this.contactService.getContacts().subscribe((data: Contact[]) => {
       this.contacts = data;
     });
   }
 
   loadContacts(): void {
-    this.contactService.getContacts().subscribe((data) => {
+    this.contactService.getContacts().subscribe((data: Contact[]) => {
       this.contacts = data;
     });
   }
 
   openContactFormModal(): void {
-    $('#contactFormModal').modal('show');  // Open the modal when the button is clicked
+    if (this.modal) {
+      const modalElement = this.modal.nativeElement;
+      const modal = new window.bootstrap.Modal(modalElement);
+      modal.show(); // Open the modal
+    }
   }
 
   closeContactFormModal(): void {
-    $('#contactFormModal').modal('hide');  // Close the modal
+    if (this.modal) {
+      const modalElement = this.modal.nativeElement;
+      const modal = new window.bootstrap.Modal(modalElement);
+      modal.hide(); // Close the modal
+    }
   }
 
   reloadContacts(): void {
@@ -39,6 +54,9 @@ export class ContactListComponent {
   }
   // Delete contact
   onDelete(contactId: number) {
+    const modalElement = this.modal.nativeElement;
+    const modal = new window.bootstrap.Modal(modalElement);
+    modal.show(); // Open the modal
     this.deleteContact.emit(contactId);
   }
   //deleteContact(id: number): void {
