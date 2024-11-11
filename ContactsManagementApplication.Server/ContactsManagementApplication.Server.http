@@ -1,0 +1,6 @@
+@ContactsManagementApplication.Server_HostAddress = http://localhost:5290
+
+GET {{ContactsManagementApplication.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
