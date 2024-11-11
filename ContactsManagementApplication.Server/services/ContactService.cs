@@ -1,4 +1,5 @@
 ﻿using ContactsManagementApplication.Models;
+using ContactsManagementApplication.Server.services;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -7,77 +8,99 @@ using System.Linq;
 
 namespace ContactsManagementApplication.Services
 {
-    public class ContactService
+    public class ContactService: IContactService
     {
-        private readonly string _dataFile = Path.Combine(Directory.GetCurrentDirectory(), "DB\\mock.json");
+        private readonly string _filePath = Path.Combine(Directory.GetCurrentDirectory(), "DB\\mock.json");
+        private readonly ILogger<ContactService> _logger;
 
-        public List<Contact> GetContacts()
+        public ContactService(ILogger<ContactService> logger)
+        {
+            _logger = logger;
+        }
+
+        public async Task<IEnumerable<Contact>> GetAllContactsAsync()
         {
             try
             {
-                if (!File.Exists(_dataFile))
-                {
-                    return new List<Contact>();
-                }
-
-                var jsonData = File.ReadAllText(_dataFile);
-                return JsonConvert.DeserializeObject<List<Contact>>(jsonData);
+                var contacts = await GetAllContactsAsync();
+                return contacts;
             }
-            catch (Exception)
+            catch (FileNotFoundException ex)
             {
-                throw new ApplicationException("Error reading contact data.");
+                _logger.LogError("File not found: {FilePath}", _filePath+",Message:"+ ex.Message);
+                return new List<Contact>();  // Return empty list if file is not found
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError("Error deserializing JSON: {Message}", ex.Message);
+                return new List<Contact>();  // Return empty list in case of JSON parsing error
             }
         }
 
-        public Contact GetContactById(int id)
+        public async Task<Contact> GetContactByIdAsync(int id)
         {
-            var contacts = GetContacts();
+            var contacts = await GetAllContactsAsync();
             return contacts.FirstOrDefault(c => c.Id == id);
         }
 
-        public void AddContact(Contact contact)
+        public async Task<Contact> CreateContactAsync(Contact contact)
         {
-            var contacts = GetContacts();
-            contact.Id = contacts.Any() ? contacts.Max(c => c.Id) + 1 : 1;
+            var contacts = await ReadContactsFromFileAsync();
+            contact.Id = contacts.Any() ? contacts.Max(c => c.Id) + 1 : 1; // Set ID based on the current max ID
             contacts.Add(contact);
-            SaveContacts(contacts);
+            await WriteContactsToFileAsync(contacts);
+            return contact;
         }
 
-        public void UpdateContact(int id, Contact contact)
+        public async Task<Contact> UpdateContactAsync(int id, Contact contact)
         {
-            var contacts = GetContacts();
+            var contacts = await ReadContactsFromFileAsync();
             var existingContact = contacts.FirstOrDefault(c => c.Id == id);
 
-            if (existingContact == null)
+            if (existingContact != null)
             {
-                throw new ApplicationException("Contact not found.");
+                existingContact.FirstName = contact.FirstName;
+                existingContact.LastName = contact.LastName;
+                existingContact.Email = contact.Email;
+                await WriteContactsToFileAsync(contacts);
+                return existingContact;
             }
-
-            existingContact.FirstName = contact.FirstName;
-            existingContact.LastName = contact.LastName;
-            existingContact.Email = contact.Email;
-
-            SaveContacts(contacts);
+            return null;
         }
 
-        public void DeleteContact(int id)
+        public async Task<bool> DeleteContactAsync(int id)
         {
-            var contacts = GetContacts();
+            var contacts = await ReadContactsFromFileAsync();
             var contactToDelete = contacts.FirstOrDefault(c => c.Id == id);
 
-            if (contactToDelete == null)
+            if (contactToDelete != null)
             {
-                throw new ApplicationException("Contact not found.");
+                contacts.Remove(contactToDelete);
+                await WriteContactsToFileAsync(contacts);
+                return true;
+            }
+            return false;
+        }
+
+        // Helper method to read contacts from the file
+        private async Task<List<Contact>> ReadContactsFromFileAsync()
+        {
+            if (!File.Exists(_filePath))
+            {
+                // If the file doesn't exist, return an empty list
+                return new List<Contact>();
             }
 
-            contacts.Remove(contactToDelete);
-            SaveContacts(contacts);
+            var json = await File.ReadAllTextAsync(_filePath);
+            return JsonConvert.DeserializeObject<List<Contact>>(json) ?? new List<Contact>();
         }
 
-        private void SaveContacts(List<Contact> contacts)
+        // Helper method to write contacts to the file
+        private async Task WriteContactsToFileAsync(List<Contact> contacts)
         {
-            var jsonData = JsonConvert.SerializeObject(contacts, Formatting.Indented);
-            File.WriteAllText(_dataFile, jsonData);
+            var json = JsonConvert.SerializeObject(contacts, Formatting.Indented);
+            await File.WriteAllTextAsync(_filePath, json);
         }
+
     }
 }
